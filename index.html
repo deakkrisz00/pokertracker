@@ -547,6 +547,45 @@ h1 {
   text-transform: uppercase;
 }
 
+.stats-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 14px 12px;
+  gap: 10px;
+}
+
+.stats-filter-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stats-filter-info strong {
+  color: var(--accent);
+}
+
+.stats-filter-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+
+.stats-filter-btn:hover {
+  background: #252525;
+  border-color: var(--accent);
+}
+
+.stats-filter-btn.active {
+  background: var(--accent);
+  color: #070707;
+}
+
 .export-box {
   display: none;
   padding: 0 14px 18px;
@@ -633,6 +672,45 @@ h1 {
   background: var(--surface-2);
   color: var(--text);
   padding: 0 10px;
+}
+
+.edit-history-row {
+  display: grid;
+  grid-template-columns: auto 1fr 120px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #252525;
+}
+
+.edit-history-row:last-child {
+  border-bottom: 0;
+}
+
+.edit-history-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.edit-history-row input[type="number"] {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0 10px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.edit-history-row input[type="number"]:disabled {
+  opacity: 0.3;
+  background: #141414;
+  cursor: not-allowed;
 }
 
 .modal-total {
@@ -912,7 +990,8 @@ h1 {
     </section>
 
     <section class="toolbar">
-      <input id="name" placeholder="Játékos">
+      <input id="name" placeholder="Játékos" list="playerSuggestions" autocomplete="off">
+      <datalist id="playerSuggestions"></datalist>
       <button class="add-btn" data-action="add-player" aria-label="Játékos hozzáadása">+</button>
     </section>
 
@@ -946,6 +1025,10 @@ h1 {
   </main>
 
   <main class="history-view" id="statsView">
+    <div class="stats-filter-bar" id="statsFilterBar">
+      <span class="stats-filter-info" id="statsFilterInfo">Szűrés: <strong>min. 3 parti</strong></span>
+      <button class="stats-filter-btn" id="toggleStatsFilterBtn" data-action="toggle-stats-filter">Mindenki mutatása</button>
+    </div>
     <section class="history-list" id="statsList"></section>
     <div class="empty hidden" id="emptyStats">
       Még nincs statisztika. Zárj le legalább egy partit, és itt megjelenik az összesített eredmény.
@@ -960,6 +1043,22 @@ h1 {
       <div class="modal-actions">
         <button class="danger" data-action="cancel-payout">Mégse</button>
         <button class="primary" data-action="save-payout">Parti mentése</button>
+      </div>
+    </div>
+  </section>
+  <section class="modal" id="editHistoryModal" aria-hidden="true">
+    <div class="modal-panel" style="max-height: 90vh; display: flex; flex-direction: column;">
+      <h2 id="editHistoryTitle">Parti szerkesztése</h2>
+      <p id="editHistoryHelp">Válaszd ki a nyertes(eke)t és add meg a nyeremény összegét:</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px;">
+        <div id="editHistoryPot" style="font-weight: 900; color: var(--accent);">Prize pool: 0 lej</div>
+        <button type="button" class="tab" id="editHistorySplitBtn" style="padding: 4px 10px; font-size: 13px;">Egyenlő elosztás</button>
+      </div>
+      <div class="payout-list" id="editHistoryList" style="overflow-y: auto; max-height: 48vh; padding-right: 4px;"></div>
+      <div class="modal-total" id="editHistoryTotal"></div>
+      <div class="modal-actions">
+        <button class="danger" data-action="cancel-edit-history">Mégse</button>
+        <button class="primary" data-action="save-edit-history">Mentés</button>
       </div>
     </div>
   </section>
@@ -1122,17 +1221,32 @@ function addPlayer(){
   const name = input.value.trim();
   if(!name) return;
 
-  players.push({
-    id: Date.now() + Math.floor(Math.random() * 1000),
-    name,
-    buyins: 1,
-    paid: false,
-    rebuys: 0,
-    out: false,
-    eliminatedOrder: 0,
-    photo: "",
-    color: COLORS[players.length % COLORS.length]
-  });
+  const existing = players.find(p => p.name.trim().toLowerCase() === name.toLowerCase());
+  if(existing){
+    if(existing.buyins < 1){
+      existing.buyins = 1;
+      existing.paid = false;
+      existing.rebuys = 0;
+      existing.out = false;
+      existing.eliminatedOrder = 0;
+    } else {
+      showAlert(existing.name + " már hozzá van adva az aktuális partihoz!");
+      input.value = "";
+      return;
+    }
+  } else {
+    players.push({
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      name,
+      buyins: 1,
+      paid: false,
+      rebuys: 0,
+      out: false,
+      eliminatedOrder: 0,
+      photo: "",
+      color: COLORS[players.length % COLORS.length]
+    });
+  }
 
   input.value = "";
   save();
@@ -1290,12 +1404,39 @@ function placement(player, totalPlayers){
   return "";
 }
 
+function playerHistoryGameCount(name){
+  if(!playerHistoryGameCount._cache || playerHistoryGameCount._hist !== history){
+    const counts = {};
+    history.forEach(game => {
+      (game.players || []).forEach(p => {
+        const n = String(p.name || "").trim();
+        counts[n] = (counts[n] || 0) + 1;
+      });
+    });
+    playerHistoryGameCount._cache = counts;
+    playerHistoryGameCount._hist = history;
+  }
+  return playerHistoryGameCount._cache[String(name || "").trim()] || 0;
+}
+
 function sortedCurrentPlayers(){
   return [...players].sort((a, b) => {
+    // 1. Akik bent vannak a partiban (buyins > 0), elöl vannak
     if((a.buyins > 0) !== (b.buyins > 0)) return a.buyins > 0 ? -1 : 1;
-    if(a.out !== b.out) return a.out ? 1 : -1;
-    if(a.out && b.out) return (b.eliminatedOrder || 0) - (a.eliminatedOrder || 0);
-    return players.indexOf(a) - players.indexOf(b);
+
+    // 2. A partiban lévők között: még bent lévők a kiesettek előtt
+    if(a.buyins > 0 && b.buyins > 0){
+      if(a.out !== b.out) return a.out ? 1 : -1;
+      if(a.out && b.out) return (b.eliminatedOrder || 0) - (a.eliminatedOrder || 0);
+      return players.indexOf(a) - players.indexOf(b);
+    }
+
+    // 3. A választásra váró (buyins === 0) játékosoknál:
+    // AKIK GYAKRAN JÁTSZANAK, MINDIG ELŐL LEGYENEK!
+    const countDiff = playerHistoryGameCount(b.name) - playerHistoryGameCount(a.name);
+    if(countDiff !== 0) return countDiff;
+
+    return a.name.localeCompare(b.name, "hu");
   });
 }
 
@@ -1323,11 +1464,24 @@ function escapeHtml(value){
     .replace(/'/g, "&#039;");
 }
 
+function updatePlayerDatalist(){
+  const dl = document.getElementById("playerSuggestions");
+  if(!dl) return;
+  const available = [...players]
+    .filter(p => p.buyins < 1)
+    .sort((a, b) => {
+      const diff = playerHistoryGameCount(b.name) - playerHistoryGameCount(a.name);
+      return diff !== 0 ? diff : a.name.localeCompare(b.name, "hu");
+    });
+  dl.innerHTML = available.map(p => `<option value="${escapeHtml(p.name)}">`).join("");
+}
+
 function render(){
   const list = document.getElementById("list");
   const emptyCurrent = document.getElementById("emptyCurrent");
   const alert = document.getElementById("unpaidAlert");
   list.innerHTML = "";
+  updatePlayerDatalist();
 
   let pot = 0;
   let rebuyTotal = 0;
@@ -1517,6 +1671,211 @@ function deleteHistory(id){
   });
 }
 
+let editingGameId = null;
+
+function openEditHistoryModal(id){
+  const game = history.find(g => g.id === id);
+  if(!game) return;
+  editingGameId = id;
+  const modal = document.getElementById("editHistoryModal");
+  const list = document.getElementById("editHistoryList");
+  const potEl = document.getElementById("editHistoryPot");
+  const titleEl = document.getElementById("editHistoryTitle");
+
+  titleEl.textContent = (game.name || "Parti") + " szerkesztése";
+  potEl.textContent = "Prize pool: " + money(game.pot) + " lej";
+
+  const winners = gameWinners(game);
+  const winnerMap = new Map();
+  winners.forEach(w => winnerMap.set(w.name, Number(w.winnings) || 0));
+
+  list.innerHTML = game.players.map((p, idx) => {
+    const isWinner = Boolean(p.winner || winnerMap.has(p.name));
+    const winAmt = isWinner ? (winnerMap.get(p.name) ?? (p.winnings || (winners.length === 1 ? game.pot : 0))) : 0;
+    return `
+      <div class="edit-history-row">
+        <label style="display:flex; align-items:center; cursor:pointer;" title="${escapeHtml(p.name)} nyertesnek jelölése">
+          <input type="checkbox" class="edit-winner-cb" data-player-index="${idx}" ${isWinner ? "checked" : ""}>
+        </label>
+        <div>
+          <div style="font-weight:900; font-size:15px;">${escapeHtml(p.name)}</div>
+          <small style="color:var(--muted); font-size:12px;">Befizetés: ${money(p.total)} lej · Rebuy: ${p.rebuys || 0}×</small>
+        </div>
+        <div>
+          <input type="number" step="0.01" min="0" class="edit-winner-input" data-player-index="${idx}" inputmode="decimal" value="${money(winAmt)}" ${isWinner ? "" : "disabled"}>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  list.querySelectorAll(".edit-winner-cb").forEach(cb => {
+    cb.addEventListener("change", e => onEditWinnerToggle(e.target));
+  });
+  list.querySelectorAll(".edit-winner-input").forEach(input => {
+    input.addEventListener("input", updateEditHistoryTotal);
+  });
+
+  updateEditHistoryTotal();
+  modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function onEditWinnerToggle(cb){
+  const game = history.find(g => g.id === editingGameId);
+  if(!game) return;
+  const idx = cb.dataset.playerIndex;
+  const input = document.querySelector(`.edit-winner-input[data-player-index="${idx}"]`);
+  if(!input) return;
+
+  const checkedBoxes = [...document.querySelectorAll(".edit-winner-cb:checked")];
+
+  if(cb.checked){
+    input.disabled = false;
+    if(checkedBoxes.length === 1){
+      input.value = money(game.pot);
+    } else {
+      if(Number(input.value) <= 0){
+        input.value = money(0);
+      }
+    }
+  } else {
+    input.value = "0";
+    input.disabled = true;
+    if(checkedBoxes.length === 1){
+      const soleIdx = checkedBoxes[0].dataset.playerIndex;
+      const soleInput = document.querySelector(`.edit-winner-input[data-player-index="${soleIdx}"]`);
+      if(soleInput) soleInput.value = money(game.pot);
+    }
+  }
+  updateEditHistoryTotal();
+}
+
+function splitEditHistoryEqually(){
+  const game = history.find(g => g.id === editingGameId);
+  if(!game) return;
+  const checkedBoxes = [...document.querySelectorAll(".edit-winner-cb:checked")];
+  if(!checkedBoxes.length){
+    showAlert("Jelölj ki legalább egy nyertest az elosztáshoz!");
+    return;
+  }
+  const pot = Number(game.pot) || 0;
+  const count = checkedBoxes.length;
+  const share = Math.round((pot / count) * 100) / 100;
+  checkedBoxes.forEach((cb, i) => {
+    const idx = cb.dataset.playerIndex;
+    const input = document.querySelector(`.edit-winner-input[data-player-index="${idx}"]`);
+    if(input){
+      input.disabled = false;
+      const amt = (i === count - 1) ? (pot - share * (count - 1)) : share;
+      input.value = money(amt);
+    }
+  });
+  updateEditHistoryTotal();
+}
+
+function updateEditHistoryTotal(){
+  const game = history.find(g => g.id === editingGameId);
+  if(!game) return;
+  const pot = Number(game.pot) || 0;
+  const checkedBoxes = [...document.querySelectorAll(".edit-winner-cb:checked")];
+  let sum = 0;
+  checkedBoxes.forEach(cb => {
+    const idx = cb.dataset.playerIndex;
+    const input = document.querySelector(`.edit-winner-input[data-player-index="${idx}"]`);
+    if(input){
+      sum += Number(String(input.value).replace(",", ".")) || 0;
+    }
+  });
+
+  const totalEl = document.getElementById("editHistoryTotal");
+  const diff = Math.round((pot - sum) * 100) / 100;
+  if(Math.abs(diff) < 0.01){
+    totalEl.innerHTML = `Összesen kiosztva: <strong style="color:var(--green);">${money(sum)} lej</strong> (Prize pool: ${money(pot)} lej ✓)`;
+  } else if(diff > 0){
+    totalEl.innerHTML = `Összesen kiosztva: <strong style="color:var(--accent);">${money(sum)} lej</strong> (Prize pool: ${money(pot)} lej · Hiányzik: ${money(diff)} lej)`;
+  } else {
+    totalEl.innerHTML = `Összesen kiosztva: <strong style="color:var(--red);">${money(sum)} lej</strong> (Prize pool: ${money(pot)} lej · Többlet: ${money(Math.abs(diff))} lej)`;
+  }
+}
+
+function hideEditHistoryModal(){
+  const modal = document.getElementById("editHistoryModal");
+  if(modal){
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  editingGameId = null;
+}
+
+function saveEditHistoryModal(){
+  const game = history.find(g => g.id === editingGameId);
+  if(!game) return;
+  const checkedBoxes = [...document.querySelectorAll(".edit-winner-cb:checked")];
+  if(!checkedBoxes.length){
+    showAlert("Legalább egy nyertest jelölj ki!");
+    return;
+  }
+
+  const winnersData = [];
+  let sum = 0;
+  for(const cb of checkedBoxes){
+    const idx = Number(cb.dataset.playerIndex);
+    const p = game.players[idx];
+    if(!p) continue;
+    const input = document.querySelector(`.edit-winner-input[data-player-index="${idx}"]`);
+    const val = Number(String(input ? input.value : 0).replace(",", "."));
+    if(!Number.isFinite(val) || val < 0){
+      showAlert("Minden nyerteshez érvényes összeget írj be!");
+      return;
+    }
+    sum += val;
+    winnersData.push({ name: p.name, winnings: val });
+  }
+
+  const pot = Number(game.pot) || 0;
+  if(Math.abs(sum - pot) > 0.05){
+    showConfirm(
+      "Összeg eltérés",
+      "A megadott nyeremények összege (" + money(sum) + " lej) nem egyezik a prize poollal (" + money(pot) + " lej). Biztosan így mented?",
+      () => applyEditHistory(game, winnersData)
+    );
+    return;
+  }
+
+  applyEditHistory(game, winnersData);
+}
+
+function applyEditHistory(game, winnersData){
+  game.winners = winnersData.map(w => ({ name: w.name, winnings: w.winnings }));
+  game.winner = winnersData.length === 1 ? { name: winnersData[0].name, winnings: winnersData[0].winnings } : null;
+
+  game.players.forEach(p => {
+    const w = winnersData.find(item => item.name === p.name);
+    if(w){
+      p.winner = true;
+      p.winnings = w.winnings;
+      p.profit = w.winnings - (Number(p.total) || 0);
+      p.placement = 1;
+    } else {
+      p.winner = false;
+      p.winnings = 0;
+      p.profit = -(Number(p.total) || 0);
+      if(p.placement === 1) p.placement = 2;
+    }
+  });
+
+  game.players.sort((a, b) => {
+    const aPlace = a.placement || 999;
+    const bPlace = b.placement || 999;
+    if(aPlace !== bPlace) return aPlace - bPlace;
+    return playerProfit(b) - playerProfit(a);
+  });
+
+  saveHistory();
+  hideEditHistoryModal();
+  showAlert("Parti sikeresen módosítva!");
+}
+
 function formatDate(value){
   return new Date(value).toLocaleString("hu-HU", {
     year: "numeric",
@@ -1649,6 +2008,7 @@ function renderHistory(){
         `).join("")}
       </div>
       <div class="history-actions">
+        <button class="primary" data-action="edit-history" data-id="${game.id}">Parti szerkesztése</button>
         <button class="danger" data-action="delete-history" data-id="${game.id}">Parti törlése</button>
       </div>
     `;
@@ -1685,14 +2045,52 @@ function buildStats(){
   return Object.values(stats).sort((a, b) => b.profit - a.profit);
 }
 
+let showAllStats = false;
+
+function toggleStatsFilter(){
+  showAllStats = !showAllStats;
+  renderStats();
+}
+
 function renderStats(){
   const list = document.getElementById("statsList");
   const empty = document.getElementById("emptyStats");
-  const stats = buildStats();
-  list.innerHTML = "";
-  empty.classList.toggle("hidden", stats.length > 0);
+  const filterInfo = document.getElementById("statsFilterInfo");
+  const filterBtn = document.getElementById("toggleStatsFilterBtn");
+  const allStats = buildStats();
 
-  stats.forEach((player, index) => {
+  const minGames = 3;
+  const filteredStats = showAllStats ? allStats : allStats.filter(p => p.games >= minGames);
+  const hiddenCount = allStats.length - filteredStats.length;
+
+  if(filterInfo && filterBtn){
+    if(showAllStats){
+      filterInfo.innerHTML = `Összes játékos megjelenítve (<strong>${allStats.length}</strong>)`;
+      filterBtn.textContent = `Csak min. ${minGames} parti`;
+      filterBtn.classList.add("active");
+    } else {
+      filterInfo.innerHTML = `Szűrés: <strong>min. ${minGames} parti</strong> (${filteredStats.length} játékos)`;
+      filterBtn.textContent = hiddenCount > 0 ? `Mindenki mutatása (+${hiddenCount} rejtve)` : `Mindenki mutatása`;
+      filterBtn.classList.remove("active");
+    }
+  }
+
+  list.innerHTML = "";
+  if(!allStats.length){
+    empty.textContent = "Még nincs statisztika. Zárj le legalább egy partit, és itt megjelenik az összesített eredmény.";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  if(!filteredStats.length){
+    empty.textContent = `Nincs játékos legalább ${minGames} lejátszott partival. Kattints a "Mindenki mutatása" gombra!`;
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+
+  filteredStats.forEach((player, index) => {
     const card = document.createElement("article");
     card.className = "stats-card";
     card.innerHTML = `
@@ -1887,6 +2285,7 @@ function handleAction(action, id){
   if(action === "show-current") showView("current");
   if(action === "show-history") showView("history");
   if(action === "show-stats") showView("stats");
+  if(action === "toggle-stats-filter") toggleStatsFilter();
   if(action === "add-player") addPlayer();
   if(action === "finish-game") finishGame();
   if(action === "reset-current") resetCurrent();
@@ -1900,6 +2299,9 @@ function handleAction(action, id){
   if(action === "choose-photo") choosePhoto(id);
   if(action === "delete-player") deletePlayer(id);
   if(action === "delete-history") deleteHistory(id);
+  if(action === "edit-history") openEditHistoryModal(id);
+  if(action === "cancel-edit-history") hideEditHistoryModal();
+  if(action === "save-edit-history") saveEditHistoryModal();
   if(action === "export-json") exportData("json").catch(error => showAlert("Export hiba: " + error.message));
   if(action === "import-json") importData();
   if(action === "cancel-payout"){
@@ -1923,6 +2325,17 @@ document.getElementById("gameName").addEventListener("input", saveGameName);
 document.getElementById("photoInput").addEventListener("change", event => {
   savePhoto(event.target.files[0]);
 });
+
+const editHistoryModalEl = document.getElementById("editHistoryModal");
+if(editHistoryModalEl){
+  editHistoryModalEl.addEventListener("click", event => {
+    if(event.target === event.currentTarget) hideEditHistoryModal();
+  });
+}
+const editHistorySplitBtnEl = document.getElementById("editHistorySplitBtn");
+if(editHistorySplitBtnEl){
+  editHistorySplitBtnEl.addEventListener("click", splitEditHistoryEqually);
+}
 
 // ── PIN logic ────────────────────────────────────────────────
 let pinBuffer = "";
